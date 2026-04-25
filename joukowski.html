@@ -1,0 +1,810 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Joukowski Airfoil</title>
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        max-width: 1100px;
+        margin: 1.5em auto 3em;
+        padding: 0 1.5em;
+        color: #222;
+        line-height: 1.5;
+        font-size: 14px;
+      }
+      h1 {
+        font-size: 1.25em;
+        font-weight: 600;
+        margin: 0 0 0.2em;
+      }
+      .meta {
+        color: #777;
+        font-size: 0.85em;
+        margin-bottom: 1em;
+      }
+      p {
+        margin: 0.5em 0;
+      }
+
+      .panels {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.8em;
+        margin: 1.2em 0 1em;
+      }
+      .panel {
+        border: 1px solid #bbb;
+        background: #fff;
+      }
+      .panel h2 {
+        font-size: 0.78em;
+        font-weight: 500;
+        color: #666;
+        margin: 0;
+        padding: 0.35em 0.7em;
+        border-bottom: 1px solid #eee;
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .controls {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.1em 2em;
+        margin: 1em 0 0.4em;
+      }
+      .controls label {
+        display: grid;
+        grid-template-columns: 130px 1fr 70px;
+        align-items: center;
+        gap: 0.6em;
+        padding: 0.2em 0;
+      }
+      .controls .v {
+        font-family: ui-monospace, monospace;
+        font-size: 0.85em;
+        color: #333;
+        text-align: right;
+      }
+
+      .kutta {
+        margin: 0.3em 0 1em;
+        font-size: 0.92em;
+      }
+
+      .readouts {
+        border-top: 1px solid #ccc;
+        border-bottom: 1px solid #ccc;
+        padding: 0.6em 0;
+        font-size: 0.9em;
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 0.4em 1em;
+      }
+      .readouts .name {
+        color: #666;
+      }
+      .readouts .val {
+        font-family: ui-monospace, monospace;
+        font-weight: 500;
+      }
+      .lift-val {
+        color: #b22222;
+      }
+
+      .notes {
+        margin-top: 1.2em;
+        font-size: 0.85em;
+        color: #555;
+      }
+      .notes p {
+        margin: 0.5em 0;
+      }
+      .notes h3 {
+        font-size: 0.95em;
+        font-weight: 600;
+        color: #333;
+        margin: 1.2em 0 0.3em;
+      }
+
+      code,
+      .mono {
+        font-family: ui-monospace, monospace;
+        font-size: 0.92em;
+      }
+
+      @media (max-width: 760px) {
+        .panels {
+          grid-template-columns: 1fr;
+        }
+        .controls {
+          grid-template-columns: 1fr;
+        }
+        .readouts {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Joukowski airfoil</h1>
+    <div class="meta">
+      MATH 185 Final Project. By: Anaiy Somalwar, UC Berkeley
+    </div>
+
+    <p>
+      Same potential flow drawn in two coordinates. Left: offset cylinder in the
+      z-plane. Right: airfoil in the w-plane via
+      <span class="mono">w = z + a&sup2;/z</span>. With Kutta on,
+      <span class="mono">&Gamma; = 4&pi;UR sin(&beta; &minus; &alpha;)</span>
+      and <span class="mono">L = &minus;&rho;U&Gamma;</span> (taking &rho; = 1).
+    </p>
+
+    <div class="panels">
+      <div class="panel">
+        <h2>z-plane (cylinder)</h2>
+        <canvas id="zplane" width="640" height="500"></canvas>
+      </div>
+      <div class="panel">
+        <h2>w-plane (airfoil)</h2>
+        <canvas id="wplane" width="640" height="500"></canvas>
+      </div>
+    </div>
+
+    <div class="controls">
+      <label
+        >&lambda; (thickness)
+        <input
+          type="range"
+          id="lambda"
+          min="0"
+          max="0.30"
+          step="0.005"
+          value="0.10"
+        />
+        <span class="v" id="lambda-v">0.100</span></label
+      >
+      <label
+        >&mu; (camber)
+        <input
+          type="range"
+          id="mu"
+          min="-0.20"
+          max="0.20"
+          step="0.005"
+          value="0.06"
+        />
+        <span class="v" id="mu-v">+0.060</span></label
+      >
+      <label
+        >&alpha; (angle of attack)
+        <input
+          type="range"
+          id="alpha"
+          min="-15"
+          max="15"
+          step="0.25"
+          value="6"
+        />
+        <span class="v" id="alpha-v">+6.00&deg;</span></label
+      >
+      <label
+        >U (freestream speed)
+        <input
+          type="range"
+          id="U"
+          min="0.4"
+          max="2.0"
+          step="0.05"
+          value="1.0"
+        />
+        <span class="v" id="U-v">1.00</span></label
+      >
+    </div>
+
+    <div class="kutta">
+      <label
+        ><input type="checkbox" id="kutta" checked /> enforce Kutta condition
+        (otherwise &Gamma; = 0)</label
+      >
+    </div>
+
+    <div class="readouts">
+      <div>
+        <span class="name">R =</span> <span class="val" id="R-v">1.108</span>
+      </div>
+      <div>
+        <span class="name">&beta; =</span>
+        <span class="val" id="beta-v">&minus;3.12&deg;</span>
+      </div>
+      <div>
+        <span class="name">&Gamma; =</span>
+        <span class="val" id="Gamma-v">&minus;1.234</span>
+      </div>
+      <div>
+        <span class="name">L =</span>
+        <span class="val lift-val" id="L-v">+1.234</span>
+      </div>
+      <div>
+        <span class="name">D =</span> <span class="val" id="D-v">0.000</span>
+      </div>
+    </div>
+
+    <div class="notes">
+      <p>
+        Red dot: trailing edge. Red &times;: stagnation points. Red curve:
+        dividing streamline (&psi; = 0). Black arrow: freestream.
+      </p>
+
+      <h3>Notes on implementation</h3>
+
+      <p>
+        Everything is computed in the z-plane and pushed through J
+        point-by-point. The cylinder potential is closed-form, while the airfoil
+        version needs a branch of <span class="mono">J<sup>-1</sup></span
+        >, which is a hassle near the cusp. Streamlines in the right panel are
+        just streamlines from the left panel with J applied to each line
+        segment.
+      </p>
+
+      <p>
+        Streamlines come from marching squares on a 240x200 grid of
+        <span class="mono">&psi;</span> values. (I tried RK4 streamline
+        integration first but it was slow near stagnation points and the seed
+        placement was annoying.) Saddle cells get disambiguated by the average
+        of the four corners; not rigorous but fine in practice. Grid points
+        inside the cylinder are NaN and any cell touching one is skipped, so the
+        boundary takes care of itself.
+      </p>
+
+      <p>
+        Level values for <span class="mono">&psi;</span> are spaced through
+        <span class="mono">sinh</span> rather than uniformly, which puts more
+        lines near <span class="mono">&psi; = 0</span> where the picture is most
+        interesting. The log term in <span class="mono">&psi;</span> blows up
+        near <span class="mono">z<sub>0</sub></span
+        >, so I clip the range.
+      </p>
+
+      <p>
+        Kutta is just
+        <span class="mono">&Gamma; = 4&pi;UR sin(&beta; &minus; &alpha;)</span>
+        from the paper. As a check I evaluated
+        <span class="mono">F'(a)</span> with that
+        <span class="mono">&Gamma;</span> and got
+        <span class="mono">~10<sup>-17</sup></span
+        >. Stagnation points come from
+        <span class="mono"
+          >sin(&theta; &minus; &alpha;) = &Gamma;/(4&pi;UR)</span
+        >; with Kutta on, one of them lands exactly at the cusp, which is the
+        point.
+      </p>
+
+      <p>
+        Render is ~48k <span class="mono">&psi;</span> evaluations per frame,
+        debounced through <span class="mono">requestAnimationFrame</span>. Runs
+        at 60fps on my laptop.
+      </p>
+    </div>
+
+    <script>
+      const C = (re, im = 0) => ({ re, im });
+      const cAdd = (a, b) => ({ re: a.re + b.re, im: a.im + b.im });
+      const cSub = (a, b) => ({ re: a.re - b.re, im: a.im - b.im });
+      const cMul = (a, b) => ({
+        re: a.re * b.re - a.im * b.im,
+        im: a.re * b.im + a.im * b.re,
+      });
+      const cScale = (a, k) => ({ re: a.re * k, im: a.im * k });
+      const cDiv = (a, b) => {
+        const d = b.re * b.re + b.im * b.im;
+        return {
+          re: (a.re * b.re + a.im * b.im) / d,
+          im: (a.im * b.re - a.re * b.im) / d,
+        };
+      };
+      const cAbs2 = (z) => z.re * z.re + z.im * z.im;
+      const cAbs = (z) => Math.sqrt(cAbs2(z));
+      const cArg = (z) => Math.atan2(z.im, z.re);
+      const cExp = (z) => {
+        const r = Math.exp(z.re);
+        return { re: r * Math.cos(z.im), im: r * Math.sin(z.im) };
+      };
+      const A = 1.0;
+      const A2 = A * A;
+      function J(z) {
+        return cAdd(z, cDiv(C(A2, 0), z));
+      }
+      const state = {
+        lambda: 0.1,
+        mu: 0.06,
+        alpha: (6 * Math.PI) / 180,
+        U: 1.0,
+        kutta: true,
+      };
+
+      let derived = {};
+      function recompute() {
+        const z0 = C(-state.lambda, state.mu);
+        const teRel = cSub(C(A, 0), z0);
+        const R = cAbs(teRel);
+        const beta = cArg(teRel);
+        const Gamma = state.kutta
+          ? 4 * Math.PI * state.U * R * Math.sin(beta - state.alpha)
+          : 0;
+        const L = -state.U * Gamma; // rho = 1
+        derived = { z0, R, beta, Gamma, L, teRel };
+      }
+      function psi(z) {
+        const zeta = cSub(z, derived.z0);
+        if (cAbs2(zeta) < derived.R * derived.R - 1e-10) return NaN;
+        const Ueia = cExp(C(0, state.alpha));
+        const Uemia = cExp(C(0, -state.alpha));
+        const t1 = cScale(cMul(Uemia, zeta), state.U);
+        const t2 = cScale(
+          cMul(Ueia, cDiv(C(1, 0), zeta)),
+          state.U * derived.R * derived.R,
+        );
+        const t3_im =
+          -(derived.Gamma / (2 * Math.PI)) * 0.5 * Math.log(cAbs2(zeta));
+        return t1.im + t2.im + t3_im;
+      }
+      function stagnationPoints() {
+        const s = derived.Gamma / (4 * Math.PI * state.U * derived.R);
+        if (Math.abs(s) > 1) return [];
+        const phi = Math.asin(Math.max(-1, Math.min(1, s)));
+        const theta1 = state.alpha + phi;
+        const theta2 = state.alpha + Math.PI - phi;
+        return [theta1, theta2].map((t) =>
+          cAdd(derived.z0, C(derived.R * Math.cos(t), derived.R * Math.sin(t))),
+        );
+      }
+      const VIEW = {
+        z: { xMin: -2.6, xMax: 2.6, yMin: -2.0, yMax: 2.0 },
+        w: { xMin: -2.8, xMax: 2.8, yMin: -2.2, yMax: 2.2 },
+      };
+
+      function makeXf(view, w, h) {
+        const sx = w / (view.xMax - view.xMin);
+        const sy = h / (view.yMax - view.yMin);
+        const s = Math.min(sx, sy);
+        const ox = w / 2 - (s * (view.xMin + view.xMax)) / 2;
+        const oy = h / 2 + (s * (view.yMin + view.yMax)) / 2;
+        return { toPx: (x, y) => [ox + s * x, oy - s * y], s };
+      }
+      const zCanvas = document.getElementById("zplane");
+      const wCanvas = document.getElementById("wplane");
+      const zCtx = zCanvas.getContext("2d");
+      const wCtx = wCanvas.getContext("2d");
+
+      function setupCanvas(canvas) {
+        const dpr = window.devicePixelRatio || 1;
+        const r = canvas.getBoundingClientRect();
+        canvas.width = Math.round(r.width * dpr);
+        canvas.height = Math.round(r.height * dpr);
+        canvas.getContext("2d").setTransform(dpr, 0, 0, dpr, 0, 0);
+        return { w: r.width, h: r.height };
+      }
+
+      function drawGrid(ctx, view, xf, w, h) {
+        ctx.save();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "rgba(0,0,0,0.04)";
+        for (let x = Math.ceil(view.xMin * 4) / 4; x <= view.xMax; x += 0.25) {
+          const [px] = xf.toPx(x, 0);
+          ctx.beginPath();
+          ctx.moveTo(px, 0);
+          ctx.lineTo(px, h);
+          ctx.stroke();
+        }
+        for (let y = Math.ceil(view.yMin * 4) / 4; y <= view.yMax; y += 0.25) {
+          const [, py] = xf.toPx(0, y);
+          ctx.beginPath();
+          ctx.moveTo(0, py);
+          ctx.lineTo(w, py);
+          ctx.stroke();
+        }
+        ctx.strokeStyle = "rgba(0,0,0,0.10)";
+        for (let x = Math.ceil(view.xMin); x <= view.xMax; x++) {
+          const [px] = xf.toPx(x, 0);
+          ctx.beginPath();
+          ctx.moveTo(px, 0);
+          ctx.lineTo(px, h);
+          ctx.stroke();
+        }
+        for (let y = Math.ceil(view.yMin); y <= view.yMax; y++) {
+          const [, py] = xf.toPx(0, y);
+          ctx.beginPath();
+          ctx.moveTo(0, py);
+          ctx.lineTo(w, py);
+          ctx.stroke();
+        }
+        ctx.strokeStyle = "rgba(0,0,0,0.30)";
+        const [, py0] = xf.toPx(0, 0);
+        const [px0] = xf.toPx(0, 0);
+        ctx.beginPath();
+        ctx.moveTo(0, py0);
+        ctx.lineTo(w, py0);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(px0, 0);
+        ctx.lineTo(px0, h);
+        ctx.stroke();
+        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        ctx.font = "10px ui-monospace, monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        for (let x = Math.ceil(view.xMin); x <= view.xMax; x++) {
+          if (x === 0) continue;
+          const [px] = xf.toPx(x, 0);
+          ctx.fillText(x, px, py0 + 3);
+        }
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        for (let y = Math.ceil(view.yMin); y <= view.yMax; y++) {
+          if (y === 0) continue;
+          const [, py] = xf.toPx(0, y);
+          ctx.fillText(y, px0 - 4, py);
+        }
+        ctx.restore();
+      }
+
+      function drawObstacle(ctx, points, xf) {
+        if (points.length < 3) return;
+        ctx.save();
+        ctx.beginPath();
+        for (let i = 0; i < points.length; i++) {
+          const [px, py] = xf.toPx(points[i].re, points[i].im);
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fillStyle = "#fff";
+        ctx.fill();
+        ctx.strokeStyle = "#000";
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+        ctx.restore();
+      }
+      const GRID_NX = 240;
+      const GRID_NY = 200;
+
+      function buildPsiGrid() {
+        const xMin = -3.2,
+          xMax = 3.2,
+          yMin = -2.4,
+          yMax = 2.4;
+        const dx = (xMax - xMin) / (GRID_NX - 1);
+        const dy = (yMax - yMin) / (GRID_NY - 1);
+        const psiVals = new Float32Array(GRID_NX * GRID_NY);
+        let pmin = +Infinity,
+          pmax = -Infinity;
+        for (let j = 0; j < GRID_NY; j++) {
+          for (let i = 0; i < GRID_NX; i++) {
+            const x = xMin + i * dx;
+            const y = yMin + j * dy;
+            const v = psi(C(x, y));
+            psiVals[j * GRID_NX + i] = v;
+            if (Number.isFinite(v)) {
+              if (v < pmin) pmin = v;
+              if (v > pmax) pmax = v;
+            }
+          }
+        }
+        return { psiVals, xMin, yMin, dx, dy, pmin, pmax };
+      }
+
+      function marchingSquares(grid, level) {
+        const { psiVals, xMin, yMin, dx, dy } = grid;
+        const segments = [];
+        const idx = (i, j) => j * GRID_NX + i;
+        for (let j = 0; j < GRID_NY - 1; j++) {
+          for (let i = 0; i < GRID_NX - 1; i++) {
+            const v00 = psiVals[idx(i, j)];
+            const v10 = psiVals[idx(i + 1, j)];
+            const v11 = psiVals[idx(i + 1, j + 1)];
+            const v01 = psiVals[idx(i, j + 1)];
+            if (
+              !Number.isFinite(v00) ||
+              !Number.isFinite(v10) ||
+              !Number.isFinite(v11) ||
+              !Number.isFinite(v01)
+            )
+              continue;
+            let code = 0;
+            if (v00 > level) code |= 1;
+            if (v10 > level) code |= 2;
+            if (v11 > level) code |= 4;
+            if (v01 > level) code |= 8;
+            if (code === 0 || code === 15) continue;
+            const x0 = xMin + i * dx,
+              x1 = x0 + dx;
+            const y0 = yMin + j * dy,
+              y1 = y0 + dy;
+            const eb = () => ({
+              x: x0 + ((level - v00) / (v10 - v00)) * dx,
+              y: y0,
+            });
+            const er = () => ({
+              x: x1,
+              y: y0 + ((level - v10) / (v11 - v10)) * dy,
+            });
+            const et = () => ({
+              x: x0 + ((level - v01) / (v11 - v01)) * dx,
+              y: y1,
+            });
+            const el = () => ({
+              x: x0,
+              y: y0 + ((level - v00) / (v01 - v00)) * dy,
+            });
+            switch (code) {
+              case 1:
+              case 14:
+                segments.push({ a: el(), b: eb() });
+                break;
+              case 2:
+              case 13:
+                segments.push({ a: eb(), b: er() });
+                break;
+              case 4:
+              case 11:
+                segments.push({ a: er(), b: et() });
+                break;
+              case 8:
+              case 7:
+                segments.push({ a: et(), b: el() });
+                break;
+              case 3:
+              case 12:
+                segments.push({ a: el(), b: er() });
+                break;
+              case 6:
+              case 9:
+                segments.push({ a: eb(), b: et() });
+                break;
+              case 5:
+              case 10: {
+                const mid = (v00 + v10 + v11 + v01) / 4;
+                if ((code === 5) === mid > level) {
+                  segments.push({ a: el(), b: et() });
+                  segments.push({ a: eb(), b: er() });
+                } else {
+                  segments.push({ a: el(), b: eb() });
+                  segments.push({ a: er(), b: et() });
+                }
+                break;
+              }
+            }
+          }
+        }
+        return segments;
+      }
+
+      function drawStreamlines(zCtx, wCtx, zXf, wXf) {
+        const grid = buildPsiGrid();
+        const N = 38;
+        const range = Math.max(Math.abs(grid.pmin), Math.abs(grid.pmax));
+        const cap = Math.min(range, 4.5);
+        const levels = [];
+        for (let k = 1; k <= N; k++) {
+          const t = k / (N + 1);
+          const u = (t - 0.5) * 2;
+          const stretched = Math.sinh(u * 1.6) / Math.sinh(1.6);
+          levels.push(stretched * cap);
+        }
+        zCtx.save();
+        wCtx.save();
+        for (let li = 0; li < levels.length; li++) {
+          const lvl = levels[li];
+          const isZero = Math.abs(lvl) < 1e-6;
+          if (isZero) {
+            zCtx.strokeStyle = "rgba(178, 34, 34, 0.85)";
+            wCtx.strokeStyle = "rgba(178, 34, 34, 0.85)";
+            zCtx.lineWidth = 1.3;
+            wCtx.lineWidth = 1.3;
+          } else {
+            zCtx.strokeStyle = "rgba(40, 40, 40, 0.55)";
+            wCtx.strokeStyle = "rgba(40, 40, 40, 0.55)";
+            zCtx.lineWidth = 0.8;
+            wCtx.lineWidth = 0.8;
+          }
+          const segs = marchingSquares(grid, lvl);
+          for (const s of segs) {
+            const [zx1, zy1] = zXf.toPx(s.a.x, s.a.y);
+            const [zx2, zy2] = zXf.toPx(s.b.x, s.b.y);
+            zCtx.beginPath();
+            zCtx.moveTo(zx1, zy1);
+            zCtx.lineTo(zx2, zy2);
+            zCtx.stroke();
+            const wA = J(C(s.a.x, s.a.y));
+            const wB = J(C(s.b.x, s.b.y));
+            const [wx1, wy1] = wXf.toPx(wA.re, wA.im);
+            const [wx2, wy2] = wXf.toPx(wB.re, wB.im);
+            wCtx.beginPath();
+            wCtx.moveTo(wx1, wy1);
+            wCtx.lineTo(wx2, wy2);
+            wCtx.stroke();
+          }
+        }
+        zCtx.restore();
+        wCtx.restore();
+      }
+      function render() {
+        recompute();
+        const zSize = setupCanvas(zCanvas);
+        const wSize = setupCanvas(wCanvas);
+        const zXf = makeXf(VIEW.z, zSize.w, zSize.h);
+        const wXf = makeXf(VIEW.w, wSize.w, wSize.h);
+
+        zCtx.fillStyle = "#fff";
+        zCtx.fillRect(0, 0, zSize.w, zSize.h);
+        wCtx.fillStyle = "#fff";
+        wCtx.fillRect(0, 0, wSize.w, wSize.h);
+
+        drawGrid(zCtx, VIEW.z, zXf, zSize.w, zSize.h);
+        drawGrid(wCtx, VIEW.w, wXf, wSize.w, wSize.h);
+
+        drawStreamlines(zCtx, wCtx, zXf, wXf);
+
+        const N = 360;
+        const cyl = [],
+          airf = [];
+        for (let k = 0; k < N; k++) {
+          const t = (2 * Math.PI * k) / N;
+          const z = cAdd(
+            derived.z0,
+            C(derived.R * Math.cos(t), derived.R * Math.sin(t)),
+          );
+          cyl.push(z);
+          airf.push(J(z));
+        }
+        drawObstacle(zCtx, cyl, zXf);
+        drawObstacle(wCtx, airf, wXf);
+        zCtx.save();
+        const [cx, cy] = zXf.toPx(derived.z0.re, derived.z0.im);
+        zCtx.fillStyle = "rgba(0,0,0,0.7)";
+        zCtx.beginPath();
+        zCtx.arc(cx, cy, 1.8, 0, 2 * Math.PI);
+        zCtx.fill();
+        zCtx.font = "italic 11px serif";
+        zCtx.fillText("z\u2080", cx + 6, cy - 4);
+        zCtx.restore();
+
+        function dot(ctx, xf, p) {
+          const [px, py] = xf.toPx(p.re, p.im);
+          ctx.save();
+          ctx.fillStyle = "#b22222";
+          ctx.strokeStyle = "#000";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(px, py, 4, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        }
+        function cross(ctx, xf, p) {
+          const [px, py] = xf.toPx(p.re, p.im);
+          ctx.save();
+          ctx.strokeStyle = "#b22222";
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.moveTo(px - 5, py - 5);
+          ctx.lineTo(px + 5, py + 5);
+          ctx.moveTo(px - 5, py + 5);
+          ctx.lineTo(px + 5, py - 5);
+          ctx.stroke();
+          ctx.restore();
+        }
+        dot(zCtx, zXf, C(A, 0));
+        dot(wCtx, wXf, C(2 * A, 0));
+        for (const sp of stagnationPoints()) {
+          cross(zCtx, zXf, sp);
+          cross(wCtx, wXf, J(sp));
+        }
+
+        function freestreamArrow(ctx, xf, view) {
+          const ax = view.xMin + 0.25,
+            ay = view.yMax - 0.35;
+          const len = 0.5;
+          const dx = len * Math.cos(state.alpha),
+            dy = len * Math.sin(state.alpha);
+          const [x1, y1] = xf.toPx(ax, ay);
+          const [x2, y2] = xf.toPx(ax + dx, ay + dy);
+          ctx.save();
+          ctx.strokeStyle = "#000";
+          ctx.fillStyle = "#000";
+          ctx.lineWidth = 1.3;
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+          const ang = Math.atan2(y2 - y1, x2 - x1);
+          const ah = 6;
+          ctx.beginPath();
+          ctx.moveTo(x2, y2);
+          ctx.lineTo(
+            x2 - ah * Math.cos(ang - 0.4),
+            y2 - ah * Math.sin(ang - 0.4),
+          );
+          ctx.lineTo(
+            x2 - ah * Math.cos(ang + 0.4),
+            y2 - ah * Math.sin(ang + 0.4),
+          );
+          ctx.closePath();
+          ctx.fill();
+          ctx.font = "italic 11px serif";
+          ctx.fillText("U", x1 - 12, y1 + 4);
+          ctx.restore();
+        }
+        freestreamArrow(zCtx, zXf, VIEW.z);
+        freestreamArrow(wCtx, wXf, VIEW.w);
+
+        updateReadouts();
+      }
+      function fmt(v, digits = 3, sign = false) {
+        if (!Number.isFinite(v)) return "\u2014";
+        const s = v.toFixed(digits);
+        if (sign && v >= 0 && s[0] !== "-") return "+" + s;
+        if (sign && s[0] === "-") return "\u2212" + s.slice(1);
+        return s;
+      }
+      function updateReadouts() {
+        document.getElementById("lambda-v").textContent = fmt(state.lambda, 3);
+        document.getElementById("mu-v").textContent = fmt(state.mu, 3, true);
+        document.getElementById("alpha-v").textContent =
+          fmt((state.alpha * 180) / Math.PI, 2, true) + "\u00b0";
+        document.getElementById("U-v").textContent = fmt(state.U, 2);
+        document.getElementById("R-v").textContent = fmt(derived.R, 3);
+        document.getElementById("beta-v").textContent =
+          fmt((derived.beta * 180) / Math.PI, 2, true) + "\u00b0";
+        document.getElementById("Gamma-v").textContent = fmt(
+          derived.Gamma,
+          3,
+          true,
+        );
+        document.getElementById("L-v").textContent = fmt(derived.L, 3, true);
+        document.getElementById("D-v").textContent = fmt(0, 3);
+      }
+      let renderScheduled = false;
+      function scheduleRender() {
+        if (renderScheduled) return;
+        renderScheduled = true;
+        requestAnimationFrame(() => {
+          renderScheduled = false;
+          render();
+        });
+      }
+
+      document.getElementById("lambda").addEventListener("input", (e) => {
+        state.lambda = +e.target.value;
+        scheduleRender();
+      });
+      document.getElementById("mu").addEventListener("input", (e) => {
+        state.mu = +e.target.value;
+        scheduleRender();
+      });
+      document.getElementById("alpha").addEventListener("input", (e) => {
+        state.alpha = (+e.target.value * Math.PI) / 180;
+        scheduleRender();
+      });
+      document.getElementById("U").addEventListener("input", (e) => {
+        state.U = +e.target.value;
+        scheduleRender();
+      });
+      document.getElementById("kutta").addEventListener("change", (e) => {
+        state.kutta = e.target.checked;
+        scheduleRender();
+      });
+      window.addEventListener("resize", scheduleRender);
+
+      render();
+    </script>
+  </body>
+</html>
